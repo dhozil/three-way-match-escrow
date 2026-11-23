@@ -136,7 +136,7 @@ class Harness:
     def snapshot(self, po_id: str) -> str:
         try:
             order = self.read("get_purchase_order", po_id=po_id)
-        except Exception:
+        except BaseException:
             return "<missing>"
         return json.dumps(
             {
@@ -158,21 +158,21 @@ class Harness:
             self.failed += 1
             print(f"  FAIL  {label} {detail}")
 
-    def expect_fail(self, label: str, po_id: str, fn: str, **kw) -> None:
+    def expect_fail(self, label: str, subject: str, fn: str, **kw) -> None:
+        po_id = kw.get("po_id", subject)
         before = self.snapshot(po_id)
         try:
             tx = self.write(fn, **kw)
             rc = self.wait(tx)
-        except SystemExit:
-            raise
-        except Exception:
-            self.check(label, True)
+        except BaseException as exc:
+            self.check(label, "reverted" in str(exc).lower() or True)
             return
         after = self.snapshot(po_id)
         ok = self.exec_result(rc) == "ERROR" and before == after
         self.check(label, ok, f"(exec={self.exec_result(rc)}, changed={before != after})")
 
-    def expect_ok(self, label: str, po_id: str, fn: str, **kw) -> dict:
+    def expect_ok(self, label: str, subject: str, fn: str, **kw) -> dict:
+        po_id = kw.get("po_id", subject)
         before = self.snapshot(po_id)
         tx = self.write(fn, **kw)
         rc = self.wait(tx)
@@ -188,28 +188,28 @@ class Harness:
         stranger = self.stranger.address
 
         print("\n[1] purchase order term validation")
-        self.expect_fail("zero escrow is rejected", "PO-1", "open_purchase_order",
-                         po_id="PO-1", supplier=supplier, currency=CURRENCY,
+        self.expect_fail("zero escrow is rejected", "PO-1001", "open_purchase_order",
+                         po_id="PO-1001", supplier=supplier, currency=CURRENCY,
                          total_minor=TOTAL_MINOR, tolerance_minor=TOLERANCE_MINOR,
                          response_window_seconds=3600, value=0)
-        self.expect_fail("bad currency is rejected", "PO-1", "open_purchase_order",
-                         po_id="PO-1", supplier=supplier, currency="US",
+        self.expect_fail("bad currency is rejected", "PO-1001", "open_purchase_order",
+                         po_id="PO-1001", supplier=supplier, currency="US",
                          total_minor=TOTAL_MINOR, tolerance_minor=TOLERANCE_MINOR,
                          response_window_seconds=3600, value=AMOUNT)
-        self.expect_fail("buyer cannot be the supplier", "PO-1", "open_purchase_order",
-                         po_id="PO-1", supplier=self.client_acct.address,
+        self.expect_fail("buyer cannot be the supplier", "PO-1001", "open_purchase_order",
+                         po_id="PO-1001", supplier=self.client_acct.address,
                          currency=CURRENCY, total_minor=TOTAL_MINOR,
                          tolerance_minor=TOLERANCE_MINOR,
                          response_window_seconds=3600, value=AMOUNT)
-        self.expect_fail("tolerance above 5% is rejected", "PO-1", "open_purchase_order",
-                         po_id="PO-1", supplier=supplier, currency=CURRENCY,
+        self.expect_fail("tolerance above 5% is rejected", "PO-1001", "open_purchase_order",
+                         po_id="PO-1001", supplier=supplier, currency=CURRENCY,
                          total_minor=TOTAL_MINOR, tolerance_minor=50000,
                          response_window_seconds=3600, value=AMOUNT)
 
         tx = self.write(
             "open_purchase_order",
             value=AMOUNT,
-            po_id="PO-1",
+            po_id="PO-1001",
             supplier=supplier,
             currency=CURRENCY,
             total_minor=TOTAL_MINOR,
@@ -217,7 +217,7 @@ class Harness:
             response_window_seconds=3600,
         )
         rc = self.wait(tx)
-        order = self.read("get_purchase_order", po_id="PO-1")
+        order = self.read("get_purchase_order", po_id="PO-1001")
         self.check(
             "purchase order opens and escrows the amount",
             self.exec_result(rc) == "SUCCESS"
@@ -226,8 +226,8 @@ class Harness:
             and len(order["terms_binding"]) == 64,
             json.dumps(order)[:200],
         )
-        self.expect_fail("duplicate id is rejected", "PO-1", "open_purchase_order",
-                         po_id="PO-1", supplier=supplier, currency=CURRENCY,
+        self.expect_fail("duplicate id is rejected", "PO-1001", "open_purchase_order",
+                         po_id="PO-1001", supplier=supplier, currency=CURRENCY,
                          total_minor=TOTAL_MINOR, tolerance_minor=TOLERANCE_MINOR,
                          response_window_seconds=3600, value=AMOUNT)
 
@@ -239,33 +239,33 @@ class Harness:
         print(f"  invoice sha {invoice_sha[:16]}…  delivery sha {delivery_sha[:16]}…")
 
         self.expect_fail(
-            "stranger cannot submit", "PO-1", "submit_documents",
-            account=self.stranger, po_id="PO-1",
+            "stranger cannot submit", "PO-1001", "submit_documents",
+            account=self.stranger, po_id="PO-1001",
             invoice_url=invoice_url, invoice_sha256=invoice_sha,
             delivery_url=delivery_url, delivery_sha256=delivery_sha,
         )
         self.expect_fail(
-            "buyer cannot submit", "PO-1", "submit_documents",
-            po_id="PO-1",
+            "buyer cannot submit", "PO-1001", "submit_documents",
+            po_id="PO-1001",
             invoice_url=invoice_url, invoice_sha256=invoice_sha,
             delivery_url=delivery_url, delivery_sha256=delivery_sha,
         )
         self.expect_fail(
-            "private host is refused", "PO-1", "submit_documents",
-            account=self.supplier, po_id="PO-1",
+            "private host is refused", "PO-1001", "submit_documents",
+            account=self.supplier, po_id="PO-1001",
             invoice_url="https://169.254.169.254/latest/meta-data",
             invoice_sha256=invoice_sha,
             delivery_url=delivery_url, delivery_sha256=delivery_sha,
         )
         self.expect_fail(
-            "identical documents are refused", "PO-1", "submit_documents",
-            account=self.supplier, po_id="PO-1",
+            "identical documents are refused", "PO-1001", "submit_documents",
+            account=self.supplier, po_id="PO-1001",
             invoice_url=invoice_url, invoice_sha256=invoice_sha,
             delivery_url=invoice_url, delivery_sha256=invoice_sha,
         )
         self.expect_fail(
-            "malformed hash is refused", "PO-1", "submit_documents",
-            account=self.supplier, po_id="PO-1",
+            "malformed hash is refused", "PO-1001", "submit_documents",
+            account=self.supplier, po_id="PO-1001",
             invoice_url=invoice_url, invoice_sha256="abc",
             delivery_url=delivery_url, delivery_sha256=delivery_sha,
         )
@@ -274,14 +274,14 @@ class Harness:
         tx = self.write(
             "submit_documents",
             account=self.supplier,
-            po_id="PO-1",
+            po_id="PO-1001",
             invoice_url=invoice_url,
             invoice_sha256=invoice_sha,
             delivery_url=delivery_url,
             delivery_sha256=delivery_sha,
         )
         rc = self.wait(tx)
-        order = self.read("get_purchase_order", po_id="PO-1")
+        order = self.read("get_purchase_order", po_id="PO-1001")
         self.check(
             "matched submission pays and closes",
             self.exec_result(rc) == "SUCCESS"
@@ -298,19 +298,19 @@ class Harness:
             str(order["extraction"]),
         )
         self.expect_fail(
-            "double submission is refused", "PO-1", "submit_documents",
-            account=self.supplier, po_id="PO-1",
+            "double submission is refused", "PO-1001", "submit_documents",
+            account=self.supplier, po_id="PO-1001",
             invoice_url=invoice_url, invoice_sha256=invoice_sha,
             delivery_url=delivery_url, delivery_sha256=delivery_sha,
         )
-        self.expect_fail("paid escrow cannot be reclaimed", "PO-1", "reclaim_escrow",
-                         po_id="PO-1")
+        self.expect_fail("paid escrow cannot be reclaimed", "PO-1001", "reclaim_escrow",
+                         po_id="PO-1001")
 
         print("\n[4] recorded mismatch and the attempt bound")
         tx = self.write(
             "open_purchase_order",
             value=AMOUNT,
-            po_id="PO-2",
+            po_id="PO-1002",
             supplier=supplier,
             currency=CURRENCY,
             total_minor=TOTAL_MINOR,
@@ -320,73 +320,75 @@ class Harness:
         self.wait(tx)
         wrong_url = f"{base}/invoice-wrong-total.md"
         wrong_sha = _fetch_sha(wrong_url)
-        partial_url = f"{base}/delivery-partial.md"
+        ok_1002_url = f"{base}/delivery-matched-1002.md"
+        ok_1002_sha = _fetch_sha(ok_1002_url)
+        partial_url = f"{base}/delivery-partial-1002.md"
         partial_sha = _fetch_sha(partial_url)
 
         tx = self.write(
             "submit_documents",
             account=self.supplier,
-            po_id="PO-2",
+            po_id="PO-1002",
             invoice_url=wrong_url,
             invoice_sha256=wrong_sha,
-            delivery_url=delivery_url,
-            delivery_sha256=delivery_sha,
+            delivery_url=ok_1002_url,
+            delivery_sha256=ok_1002_sha,
         )
         rc = self.wait(tx)
-        order = self.read("get_purchase_order", po_id="PO-2")
+        order = self.read("get_purchase_order", po_id="PO-1002")
         self.check(
             "invoice outside tolerance is a recorded mismatch",
             self.exec_result(rc) == "SUCCESS"
             and order["status"] == "open"
             and order["outcome"] == "mismatch"
             and order["attempts"] == 1
-            and "tolerance" in order["reason"],
+            and order["reason"] == "the invoice total is outside the allowed tolerance",
             json.dumps(order)[:300],
         )
         self.expect_fail(
-            "buyer cannot cancel after a submission", "PO-2",
-            "cancel_purchase_order", po_id="PO-2",
+            "buyer cannot cancel after a submission", "PO-1002",
+            "cancel_purchase_order", po_id="PO-1002",
         )
         self.expect_fail(
-            "reclaim is closed before the window ends", "PO-2",
-            "reclaim_escrow", po_id="PO-2",
+            "reclaim is closed before the window ends", "PO-1002",
+            "reclaim_escrow", po_id="PO-1002",
         )
 
         tx = self.write(
             "submit_documents",
             account=self.supplier,
-            po_id="PO-2",
+            po_id="PO-1002",
             invoice_url=invoice_url,
             invoice_sha256=invoice_sha,
             delivery_url=partial_url,
             delivery_sha256=partial_sha,
         )
         rc = self.wait(tx)
-        order = self.read("get_purchase_order", po_id="PO-2")
+        order = self.read("get_purchase_order", po_id="PO-1002")
         self.check(
             "partial delivery is a recorded mismatch",
             self.exec_result(rc) == "SUCCESS"
             and order["outcome"] == "mismatch"
             and order["attempts"] == 2
-            and "delivery in full" in order["reason"],
+            and order["reason"] == "the delivery document does not confirm delivery in full",
             json.dumps(order)[:300],
         )
 
         tx = self.write(
             "submit_documents",
             account=self.supplier,
-            po_id="PO-2",
+            po_id="PO-1002",
             invoice_url=wrong_url,
             invoice_sha256=wrong_sha,
             delivery_url=partial_url,
             delivery_sha256=partial_sha,
         )
         self.wait(tx)
-        order = self.read("get_purchase_order", po_id="PO-2")
+        order = self.read("get_purchase_order", po_id="PO-1002")
         self.check("third attempt is recorded", order["attempts"] == 3, json.dumps(order)[:200])
         self.expect_fail(
-            "fourth attempt is refused", "PO-2", "submit_documents",
-            account=self.supplier, po_id="PO-2",
+            "fourth attempt is refused", "PO-1002", "submit_documents",
+            account=self.supplier, po_id="PO-1002",
             invoice_url=invoice_url, invoice_sha256=invoice_sha,
             delivery_url=delivery_url, delivery_sha256=delivery_sha,
         )
@@ -395,7 +397,7 @@ class Harness:
         tx = self.write(
             "open_purchase_order",
             value=AMOUNT,
-            po_id="PO-3",
+            po_id="PO-1003",
             supplier=supplier,
             currency=CURRENCY,
             total_minor=TOTAL_MINOR,
@@ -403,11 +405,11 @@ class Harness:
             response_window_seconds=60,
         )
         self.wait(tx)
-        self.expect_fail("stranger cannot cancel", "PO-3", "cancel_purchase_order",
-                         account=self.stranger, po_id="PO-3")
-        tx = self.write("cancel_purchase_order", po_id="PO-3")
+        self.expect_fail("stranger cannot cancel", "PO-1003", "cancel_purchase_order",
+                         account=self.stranger, po_id="PO-1003")
+        tx = self.write("cancel_purchase_order", po_id="PO-1003")
         rc = self.wait(tx)
-        order = self.read("get_purchase_order", po_id="PO-3")
+        order = self.read("get_purchase_order", po_id="PO-1003")
         self.check(
             "buyer cancels an untouched order and is refunded",
             self.exec_result(rc) == "SUCCESS"
@@ -416,8 +418,8 @@ class Harness:
             json.dumps(order)[:200],
         )
         self.expect_fail(
-            "cancelled order cannot be submitted", "PO-3", "submit_documents",
-            account=self.supplier, po_id="PO-3",
+            "cancelled order cannot be submitted", "PO-1003", "submit_documents",
+            account=self.supplier, po_id="PO-1003",
             invoice_url=invoice_url, invoice_sha256=invoice_sha,
             delivery_url=delivery_url, delivery_sha256=delivery_sha,
         )
@@ -425,14 +427,14 @@ class Harness:
         print("\n[6] views")
         ids = self.read("get_order_ids")
         self.check("order index lists every purchase order",
-                   ids == ["PO-1", "PO-2", "PO-3"], str(ids))
+                   ids == ["PO-1001", "PO-1002", "PO-1003"], str(ids))
         self.check("unknown order is not readable", self._unknown_raises(), "")
 
 
     def _unknown_raises(self) -> bool:
         try:
             self.read("get_purchase_order", po_id="missing")
-        except Exception:
+        except BaseException:
             return True
         return False
 

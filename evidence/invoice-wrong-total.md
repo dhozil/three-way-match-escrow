@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Vendor | Northwind Components Ltd |
-| Purchase order | PO-1001 |
+| Purchase order | PO-1002 |
 | Invoice date | 2024-05-03 |
 | Currency | USD |
 | Payment terms | Net 30 |
@@ -18,4 +18,4 @@
 Subtotal (minor units): 260000
 Tax (minor units): 0
 
-Invoice total: 260000 minor units, currency USD, against purchase order PO-1001.
+Invoice total: 260000 minor units, currency USD, against purchase order PO-1002.

@@ -407,6 +407,10 @@ class ThreeWayMatchEscrow(gl.Contract):
     within the attempt bound and the response window.
     """
 
+    order_count: u256
+    orders: TreeMap[str, PurchaseOrder]
+    order_ids: TreeMap[str, str]
+
     def __init__(self) -> None:
         self.order_count = u256(0)
         self.orders = gl.storage.inmem_allocate(TreeMap[str, PurchaseOrder])
