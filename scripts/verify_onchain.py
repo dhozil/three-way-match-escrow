@@ -324,6 +324,8 @@ class Harness:
         ok_1002_sha = _fetch_sha(ok_1002_url)
         partial_url = f"{base}/delivery-partial-1002.md"
         partial_sha = _fetch_sha(partial_url)
+        corrected_url = f"{base}/invoice-1002-correct.md"
+        corrected_sha = _fetch_sha(corrected_url)
 
         tx = self.write(
             "submit_documents",
@@ -358,8 +360,8 @@ class Harness:
             "submit_documents",
             account=self.supplier,
             po_id="PO-1002",
-            invoice_url=invoice_url,
-            invoice_sha256=invoice_sha,
+            invoice_url=corrected_url,
+            invoice_sha256=corrected_sha,
             delivery_url=partial_url,
             delivery_sha256=partial_sha,
         )
