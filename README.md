@@ -42,7 +42,7 @@ The model never sees, and never returns, a payment decision.
 | **Contract** | [ThreeWayMatchEscrow](https://explorer-studio.genlayer.com/address/0x5d544A28C21d0c2Aaf8d6341CA597B73Efc1Db1B) |
 | **Address** | `0x5d544A28C21d0c2Aaf8d6341CA597B73Efc1Db1B` |
 | **Network** | GenLayer studionet (chain `61999`) |
-| **Deployed by** | `scripts/verify_onchain.py` (the same run that produced the 26 on-chain checks below) |
+| **Deploy** | `python scripts/verify_onchain.py` (without `--address` it deploys a fresh instance and runs the 26 checks) |
 | **Constructor args** | none |
 | **On-chain code** | byte-identical to `contracts/three_way_match_escrow.py` (SHA-256 `e32c80d0…5f21`) |
 
